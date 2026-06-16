@@ -1,60 +1,72 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Denge Labirenti Oyunu</title>
+    <meta charset="UTF-8">
+    <title>Denge Labirenti</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: sans-serif; }
-        #unity-container { width: 100%; height: 100%; position: relative; }
-        canvas { width: 100%; height: 100%; display: block; }
-        
-        #overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 10;
-        }
-        button {
-            padding: 20px 40px; font-size: 20px; cursor: pointer;
-            background: #28a745; color: white; border: none; border-radius: 50px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
+        body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { background: #333; border: 4px solid #fff; }
     </style>
 </head>
 <body>
 
-    <div id="unity-container">
-        <canvas id="unity-canvas"></canvas>
-        
-        <div id="overlay">
-            <h1>Denge Labirenti</h1>
-            <p>Başlamak için butona tıklayın ve sensör izni verin.</p>
-            <button id="start-button">OYUNU BAŞLAT</button>
-        </div>
-    </div>
+<script>
+    const { Engine, Render, Runner, Bodies, Composite, Events } = Matter;
 
-    <script>
-        const startButton = document.getElementById("start-button");
-        const overlay = document.getElementById("overlay");
+    const engine = Engine.create();
+    const render = Render.create({
+        element: document.body,
+        engine: engine,
+        options: { width: 600, height: 600, wireframes: false, background: '#2c3e50' }
+    });
 
-        startButton.addEventListener("click", () => {
-            // Jiroskop/İvmeölçer izni isteme (iOS için kritik)
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            console.log("Sensör izni verildi.");
-                            overlay.style.display = 'none';
-                            // Buraya Unity'yi başlatan fonksiyonu ekleyebilirsiniz (UnityLoader...)
-                        }
-                    })
-                    .catch(console.error);
-            } else {
-                // Android ve diğer tarayıcılar için
-                overlay.style.display = 'none';
+    // 1. Topu Oluştur
+    const ball = Bodies.circle(50, 50, 12, { render: { fillStyle: '#e74c3c' } });
+
+    // 2. Çıkış Kapısı (Sensör)
+    const exit = Bodies.rectangle(550, 550, 50, 50, { 
+        isStatic: true, isSensor: true, 
+        render: { fillStyle: '#27ae60' } 
+    });
+
+    // 3. Labirent Tasarımı (Duvarlar)
+    const walls = [
+        // Sınırlar
+        Bodies.rectangle(300, 0, 600, 20, { isStatic: true }),
+        Bodies.rectangle(300, 600, 600, 20, { isStatic: true }),
+        Bodies.rectangle(0, 300, 20, 600, { isStatic: true }),
+        Bodies.rectangle(600, 300, 20, 600, { isStatic: true }),
+        // İç labirent parçaları
+        Bodies.rectangle(150, 150, 200, 20, { isStatic: true }),
+        Bodies.rectangle(450, 200, 20, 300, { isStatic: true }),
+        Bodies.rectangle(250, 350, 300, 20, { isStatic: true }),
+        Bodies.rectangle(100, 450, 20, 200, { isStatic: true }),
+        Bodies.rectangle(350, 450, 20, 150, { isStatic: true })
+    ];
+
+    Composite.add(engine.world, [ball, exit, ...walls]);
+
+    // 4. Eğim Kontrolü (Fare ile)
+    window.addEventListener('mousemove', (e) => {
+        const rect = render.canvas.getBoundingClientRect();
+        engine.world.gravity.x = ((e.clientX - rect.left) / 600 - 0.5) * 3;
+        engine.world.gravity.y = ((e.clientY - rect.top) / 600 - 0.5) * 3;
+    });
+
+    // 5. Kazanma Kontrolü
+    Events.on(engine, 'collisionStart', (event) => {
+        event.pairs.forEach((collision) => {
+            if ((collision.bodyA === ball && collision.bodyB === exit) || 
+                (collision.bodyA === exit && collision.bodyB === ball)) {
+                alert("Tebrikler! Labirenti tamamladın!");
+                location.reload(); // Oyunu sıfırla
             }
         });
-    </script>
+    });
+
+    Render.run(render);
+    Runner.run(Runner.create(), engine);
+</script>
 </body>
 </html>
